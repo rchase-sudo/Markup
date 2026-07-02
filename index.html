@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Markup</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --navy-deep:#0B1826;
+    --navy-panel:#12233A;
+    --navy-panel-2:#17304D;
+    --grid-line:#1E3A5C;
+    --amber:#FF8A3D;
+    --amber-dim:#B8632A;
+    --ink:#E8EDF4;
+    --ink-dim:#8CA0BD;
+    --ink-faint:#516padding;
+    --danger:#E85D4A;
+    --mono: 'SF Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    height:100%; margin:0; overflow:hidden; background:var(--navy-deep);
+    font-family:var(--sans); color:var(--ink);
+    -webkit-user-select:none; user-select:none;
+  }
+  #app{
+    display:flex; flex-direction:column; height:100%;
+    height:100dvh;
+  }
+
+  /* ---------- TOP BAR ---------- */
+  #topbar{
+    display:flex; align-items:center; gap:10px;
+    padding:calc(env(safe-area-inset-top) + 10px) 12px 10px 12px;
+    background:var(--navy-panel);
+    border-bottom:1px solid var(--grid-line);
+    flex-shrink:0;
+  }
+  .brand{
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+    color:var(--amber); text-transform:uppercase; font-weight:700;
+    white-space:nowrap;
+  }
+  .brand small{display:block; color:var(--ink-dim); font-size:9px; letter-spacing:.1em; font-weight:400; margin-top:1px;}
+  #filename{
+    flex:1; min-width:0; font-family:var(--mono); font-size:11px; color:var(--ink-dim);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center;
+  }
+  .iconbtn{
+    background:var(--navy-panel-2); border:1px solid var(--grid-line); color:var(--ink);
+    width:36px; height:36px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; font-size:16px;
+  }
+  .iconbtn:active{background:var(--grid-line);}
+  .iconbtn.disabled{opacity:.35; pointer-events:none;}
+  .iconbtn svg{width:18px; height:18px;}
+
+  /* ---------- PAGE NAV ---------- */
+  #pagenav{
+    display:none; align-items:center; justify-content:center; gap:10px;
+    padding:6px 12px; background:var(--navy-panel); border-bottom:1px solid var(--grid-line);
+    font-family:var(--mono); font-size:12px; color:var(--ink-dim); flex-shrink:0;
+  }
+  #pagenav.show{display:flex;}
+  #pagenav span{color:var(--ink); min-width:64px; text-align:center;}
+
+  /* ---------- STAGE ---------- */
+  #stageWrap{
+    flex:1; position:relative; overflow:hidden;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/28px 28px,
+      var(--navy-deep);
+    background-blend-mode:overlay;
+    touch-action:none;
+  }
+  #stageWrap::before{
+    content:''; position:absolute; inset:0; opacity:.35;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/28px 28px;
+    pointer-events:none;
+  }
+  #canvasHost{
+    position:absolute; top:0; left:0; transform-origin:0 0;
+    box-shadow:0 8px 40px rgba(0,0,0,.5);
+  }
+  #pageCanvas{ display:block; background:#fff; touch-action:none; }
+
+  #emptyState{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; text-align:center; padding:40px; pointer-events:none;
+  }
+  #emptyState .glyph{
+    width:56px; height:56px; border:2px dashed var(--grid-line); border-radius:12px;
+    display:flex; align-items:center; justify-content:center; color:var(--ink-faint);
+  }
+  #emptyState h2{font-size:15px; margin:0; color:var(--ink); font-weight:600;}
+  #emptyState p{font-size:12.5px; margin:0; color:var(--ink-dim); max-width:230px; line-height:1.5;}
+
+  /* ---------- SPEC PLATE (signature element) ---------- */
+  #specPlate{
+    position:absolute; right:10px; bottom:10px;
+    background:rgba(18,35,58,.92); border:1px solid var(--grid-line); border-radius:8px;
+    padding:7px 10px; font-family:var(--mono); font-size:9.5px; color:var(--ink-dim);
+    line-height:1.6; pointer-events:none; backdrop-filter:blur(6px);
+    display:none;
+  }
+  #specPlate.show{display:block;}
+  #specPlate b{color:var(--amber); font-weight:700;}
+  #specPlate .row{display:flex; gap:8px; justify-content:space-between;}
+  #specPlate .swatch{width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:4px; vertical-align:middle;}
+
+  /* ---------- ZOOM CONTROLS ---------- */
+  #zoomCtl{
+    position:absolute; left:10px; bottom:10px;
+    display:none; flex-direction:column; overflow:hidden;
+    background:rgba(18,35,58,.92); border:1px solid var(--grid-line); border-radius:8px;
+    backdrop-filter:blur(6px);
+  }
+  #zoomCtl.show{display:flex;}
+  #zoomCtl button{
+    width:34px; height:32px; background:none; border:none; color:var(--ink);
+    font-size:16px; border-bottom:1px solid var(--grid-line);
+  }
+  #zoomCtl button:last-child{border-bottom:none;}
+  #zoomCtl button:active{background:var(--grid-line);}
+
+  /* ---------- BOTTOM DOCK ---------- */
+  #dock{
+    flex-shrink:0; background:var(--navy-panel); border-top:1px solid var(--grid-line);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  #toolRow{
+    display:flex; gap:6px; padding:10px 10px 6px 10px; overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  #toolRow::-webkit-scrollbar{display:none;}
+  .tool{
+    flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:4px;
+    width:56px; padding:7px 4px; border-radius:10px; background:var(--navy-panel-2);
+    border:1px solid var(--grid-line); color:var(--ink-dim);
+  }
+  .tool svg{width:19px; height:19px;}
+  .tool span{font-family:var(--mono); font-size:8.5px; letter-spacing:.03em; text-transform:uppercase;}
+  .tool.active{ background:rgba(255,138,61,.14); border-color:var(--amber); color:var(--amber);}
+  .tool:active{opacity:.7;}
+
+  #styleRow{
+    display:flex; align-items:center; gap:10px; padding:2px 12px 10px 12px;
+  }
+  .colorSwatches{display:flex; gap:6px; flex-shrink:0;}
+  .swatchBtn{
+    width:24px; height:24px; border-radius:50%; border:2px solid transparent;
+    flex-shrink:0;
+  }
+  .swatchBtn.selected{border-color:var(--ink);}
+  #customColor{
+    -webkit-appearance:none; appearance:none; width:24px; height:24px; border-radius:50%;
+    border:2px dashed var(--ink-faint); background:transparent; padding:0; overflow:hidden; flex-shrink:0;
+  }
+  #customColor::-webkit-color-swatch-wrapper{padding:0;}
+  #customColor::-webkit-color-swatch{border-radius:50%; border:none;}
+
+  .divider{width:1px; align-self:stretch; background:var(--grid-line); flex-shrink:0;}
+
+  #thicknessWrap{display:flex; align-items:center; gap:6px; flex:1; min-width:70px;}
+  #thicknessWrap input[type=range]{
+    flex:1; -webkit-appearance:none; appearance:none; height:3px; background:var(--grid-line); border-radius:2px;
+  }
+  #thicknessWrap input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%;
+    background:var(--amber); border:2px solid var(--navy-panel);
+  }
+  #thicknessLabel{font-family:var(--mono); font-size:10px; color:var(--ink-dim); width:22px; text-align:right; flex-shrink:0;}
+
+  #linetypeSelect{
+    flex-shrink:0; background:var(--navy-panel-2); color:var(--ink); border:1px solid var(--grid-line);
+    border-radius:7px; font-family:var(--mono); font-size:10px; padding:6px 6px; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%238CA0BD'/></svg>");
+    background-repeat:no-repeat; background-position:right 6px center; padding-right:18px;
+  }
+
+  #fileInput{display:none;}
+
+  .hint{
+    font-family:var(--mono); font-size:9px; color:var(--ink-faint); text-align:center; padding-bottom:4px;
+  }
+
+  #toast{
+    position:fixed; left:50%; top:calc(env(safe-area-inset-top) + 56px); transform:translateX(-50%) translateY(-8px);
+    background:var(--navy-panel-2); border:1px solid var(--amber); color:var(--ink);
+    font-family:var(--mono); font-size:11px; padding:8px 14px; border-radius:8px;
+    opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:50; white-space:nowrap;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <button class="iconbtn" id="btnOpen" title="Open file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h6l2 2h8v12a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg>
+    </button>
+    <div class="brand">MARKUP<small>PDF / IMG ANNOTATOR</small></div>
+    <div id="filename">No file loaded</div>
+    <button class="iconbtn" id="btnUndo" title="Undo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 015.5 5.5v0a5.5 5.5 0 01-5.5 5.5H11"/></svg>
+    </button>
+    <button class="iconbtn" id="btnRedo" title="Redo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 004 14.5v0A5.5 5.5 0 009.5 20H13"/></svg>
+    </button>
+    <button class="iconbtn" id="btnExport" title="Export">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 21h14"/></svg>
+    </button>
+  </div>
+
+  <div id="pagenav">
+    <button class="iconbtn" id="btnPrev" style="width:28px;height:28px;">‹</button>
+    <span id="pageIndicator">1 / 1</span>
+    <button class="iconbtn" id="btnNext" style="width:28px;height:28px;">›</button>
+  </div>
+
+  <div id="stageWrap">
+    <div id="emptyState">
+      <div class="glyph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="26" height="26"><path d="M4 4h6l2 2h8v12a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg>
+      </div>
+      <h2>Open a PDF or image</h2>
+      <p>Tap the folder icon above to load a drawing, then mark it up with lines, shapes, colors and linetypes — right on your phone.</p>
+    </div>
+    <div id="canvasHost">
+      <canvas id="pageCanvas"></canvas>
+    </div>
+    <div id="specPlate">
+      <div class="row"><span>TOOL</span><b id="specTool">—</b></div>
+      <div class="row"><span>LINE</span><b id="specLine">—</b></div>
+      <div class="row"><span>WT</span><b id="specWeight">—</b></div>
+      <div class="row"><span>CLR</span><span><i class="swatch" id="specSwatch"></i></span></div>
+    </div>
+    <div id="zoomCtl">
+      <button id="zoomIn">+</button>
+      <button id="zoomReset" style="font-size:10px;">1:1</button>
+      <button id="zoomOut">−</button>
+    </div>
+  </div>
+
+  <div id="dock">
+    <div id="toolRow">
+      <button class="tool active" data-tool="pen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+        <span>Pen</span>
+      </button>
+      <button class="tool" data-tool="line">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L19 5"/></svg>
+        <span>Line</span>
+      </button>
+      <button class="tool" data-tool="rect">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1"/></svg>
+        <span>Rect</span>
+      </button>
+      <button class="tool" data-tool="arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L19 5"/><path d="M9 5h10v10"/></svg>
+        <span>Arrow</span>
+      </button>
+      <button class="tool" data-tool="cloud">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 17a4 4 0 01-.6-7.96A5 5 0 0115 6.5a4.5 4.5 0 014.5 4.5v.06A3.5 3.5 0 0119 18H6.5z"/></svg>
+        <span>Cloud</span>
+      </button>
+      <button class="tool" data-tool="eraser">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3l5 5-9.5 9.5H6L2.5 14 12 4.5z"/><path d="M6 21h14"/></svg>
+        <span>Erase</span>
+      </button>
+      <button class="tool" data-tool="clear" style="color:var(--danger);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 15h10l1-15"/></svg>
+        <span>Clear</span>
+      </button>
+    </div>
+    <div id="styleRow">
+      <div class="colorSwatches" id="swatches"></div>
+      <input type="color" id="customColor" value="#ff3b30">
+      <div class="divider"></div>
+      <div id="thicknessWrap">
+        <svg width="12" height="12" style="flex-shrink:0;color:var(--ink-dim)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+        <input type="range" id="thickness" min="1" max="24" value="4">
+        <svg width="18" height="18" style="flex-shrink:0;color:var(--ink-dim)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="currentColor"/></svg>
+        <span id="thicknessLabel">4px</span>
+      </div>
+      <div class="divider"></div>
+      <select id="linetypeSelect">
+        <option value="solid">Solid</option>
+        <option value="dashed">Dashed</option>
+        <option value="dotted">Dotted</option>
+        <option value="dashdot">Dash-dot</option>
+      </select>
+    </div>
+    <div class="hint">Two fingers to pan &amp; pinch-zoom · One finger to draw</div>
+  </div>
+
+  <input type="file" id="fileInput" accept="application/pdf,image/*">
+</div>
+<div id="toast"></div>
+
+<script>
+(function(){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  // ---------- state ----------
+  const state = {
+    docType: null,      // 'pdf' | 'image'
+    pdf: null,           // pdfjs document proxy
+    pageCount: 1,
+    currentPage: 0,      // 0-indexed
+    pages: [],            // per page: {canvas: baseRenderCanvas, w, h, annotations:[], redo:[], ptW, ptH}
+    tool: 'pen',
+    color: '#ff3b30',
+    thickness: 4,
+    linetype: 'solid',
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    fileBaseName: 'markup'
+  };
+
+  const PRESET_COLORS = ['#ff3b30','#ff8a3d','#ffd60a','#34c759','#0a84ff','#5e5ce6','#111111','#ffffff'];
+
+  // ---------- element refs ----------
+  const el = id => document.getElementById(id);
+  const fileInput = el('fileInput');
+  const btnOpen = el('btnOpen');
+  const btnUndo = el('btnUndo');
+  const btnRedo = el('btnRedo');
+  const btnExport = el('btnExport');
+  const filenameEl = el('filename');
+  const pagenav = el('pagenav');
+  const pageIndicator = el('pageIndicator');
+  const btnPrev = el('btnPrev');
+  const btnNext = el('btnNext');
+  const stageWrap = el('stageWrap');
+  const canvasHost = el('canvasHost');
+  const pageCanvas = el('pageCanvas');
+  const ctx = pageCanvas.getContext('2d');
+  const emptyState = el('emptyState');
+  const specPlate = el('specPlate');
+  const specTool = el('specTool');
+  const specLine = el('specLine');
+  const specWeight = el('specWeight');
+  const specSwatch = el('specSwatch');
+  const zoomCtl = el('zoomCtl');
+  const swatchesEl = el('swatches');
+  const customColor = el('customColor');
+  const thicknessInput = el('thickness');
+  const thicknessLabel = el('thicknessLabel');
+  const linetypeSelect = el('linetypeSelect');
+  const toast = el('toast');
+
+  // ---------- toast ----------
+  let toastTimer;
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>toast.classList.remove('show'), 1800);
+  }
+
+  // ---------- swatches ----------
+  PRESET_COLORS.forEach(c=>{
+    const b = document.createElement('button');
+    b.className = 'swatchBtn' + (c===state.color?' selected':'');
+    b.style.background = c;
+    if(c==='#ffffff') b.style.boxShadow='inset 0 0 0 1px #445b7a';
+    b.dataset.color = c;
+    b.addEventListener('click', ()=> setColor(c));
+    swatchesEl.appendChild(b);
+  });
+  function setColor(c){
+    state.color = c;
+    [...swatchesEl.children].forEach(b=> b.classList.toggle('selected', b.dataset.color===c));
+    customColor.value = c;
+    updateSpecPlate();
+  }
+  customColor.addEventListener('input', e=> setColor(e.target.value));
+
+  thicknessInput.addEventListener('input', e=>{
+    state.thickness = parseInt(e.target.value,10);
+    thicknessLabel.textContent = state.thickness+'px';
+    updateSpecPlate();
+  });
+  linetypeSelect.addEventListener('change', e=>{
+    state.linetype = e.target.value;
+    updateSpecPlate();
+  });
+
+  function updateSpecPlate(){
+    specTool.textContent = state.tool.toUpperCase();
+    specLine.textContent = state.linetype.toUpperCase();
+    specWeight.textContent = state.thickness+'px';
+    specSwatch.style.background = state.color;
+  }
+
+  // ---------- tool selection ----------
+  document.querySelectorAll('.tool').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const t = btn.dataset.tool;
+      if(t==='clear'){ clearPage(); return; }
+      document.querySelectorAll('.tool').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      state.tool = t;
+      updateSpecPlate();
+    });
+  });
+
+  function clearPage(){
+    if(!state.pages.length) return;
+    const p = state.pages[state.currentPage];
+    if(!p.annotations.length) return;
+    if(!confirm('Clear all markup on this page?')) return;
+    p.redo = [];
+    p.annotations = [];
+    render();
+  }
+
+  // ---------- linetype dash patterns ----------
+  function applyLineStyle(c, thickness, linetype){
+    c.lineCap = linetype==='dotted' ? 'round' : 'round';
+    c.lineJoin = 'round';
+    switch(linetype){
+      case 'dashed': c.setLineDash([thickness*3, thickness*2.2]); break;
+      case 'dotted': c.setLineDash([0.01, thickness*2.2]); break;
+      case 'dashdot': c.setLineDash([thickness*3, thickness*1.6, thickness*0.01, thickness*1.6]); break;
+      default: c.setLineDash([]);
+    }
+  }
+
+  // ---------- annotation drawing ----------
+  function drawAnnotation(c, a){
+    c.save();
+    c.strokeStyle = a.color;
+    c.fillStyle = a.color;
+    c.lineWidth = a.thickness;
+    applyLineStyle(c, a.thickness, a.linetype);
+
+    if(a.tool === 'pen'){
+      c.beginPath();
+      a.points.forEach((pt,i)=> i===0? c.moveTo(pt.x,pt.y) : c.lineTo(pt.x,pt.y));
+      c.stroke();
+    } else if(a.tool === 'line'){
+      const [p0,p1] = a.points;
+      c.beginPath(); c.moveTo(p0.x,p0.y); c.lineTo(p1.x,p1.y); c.stroke();
+    } else if(a.tool === 'rect'){
+      const [p0,p1] = a.points;
+      c.strokeRect(Math.min(p0.x,p1.x), Math.min(p0.y,p1.y), Math.abs(p1.x-p0.x), Math.abs(p1.y-p0.y));
+    } else if(a.tool === 'arrow'){
+      const [p0,p1] = a.points;
+      c.beginPath(); c.moveTo(p0.x,p0.y); c.lineTo(p1.x,p1.y); c.stroke();
+      const ang = Math.atan2(p1.y-p0.y, p1.x-p0.x);
+      const head = Math.max(10, a.thickness*3.2);
+      c.save(); c.setLineDash([]);
+      c.beginPath();
+      c.moveTo(p1.x, p1.y);
+      c.lineTo(p1.x - head*Math.cos(ang-0.4), p1.y - head*Math.sin(ang-0.4));
+      c.lineTo(p1.x - head*Math.cos(ang+0.4), p1.y - head*Math.sin(ang+0.4));
+      c.closePath(); c.fill();
+      c.restore();
+    } else if(a.tool === 'cloud'){
+      drawCloud(c, a);
+    }
+    c.restore();
+  }
+
+  function drawCloud(c, a){
+    const [p0,p1] = a.points;
+    const x0=Math.min(p0.x,p1.x), y0=Math.min(p0.y,p1.y);
+    const x1=Math.max(p0.x,p1.x), y1=Math.max(p0.y,p1.y);
+    const w=x1-x0, h=y1-y0;
+    if(w<4||h<4) return;
+    const r = Math.max(8, a.thickness*3.5);
+    c.setLineDash([]);
+    c.beginPath();
+    const perimeterPts = [[x0,y0],[x1,y0],[x1,y1],[x0,y1],[x0,y0]];
+    let first=true, lastX, lastY;
+    for(let side=0; side<4; side++){
+      const [sx,sy]=perimeterPts[side], [ex,ey]=perimeterPts[side+1];
+      const len = Math.hypot(ex-sx, ey-sy);
+      const steps = Math.max(1, Math.round(len/(r*1.6)));
+      for(let i=0;i<steps;i++){
+        const t0=i/steps, t1=(i+1)/steps;
+        const mx=sx+(ex-sx)*(t0+t1)/2, my=sy+(ey-sy)*(t0+t1)/2;
+        const segLen = len/steps;
+        const bumpR = segLen/2;
+        const startAng = Math.atan2(sy-my, sx-my===0?0.0001:sx-my); // fallback unused
+        if(first){ c.moveTo(sx+(ex-sx)*t0, sy+(ey-sy)*t0); first=false; }
+        const cx = sx+(ex-sx)*t0, cy = sy+(ey-sy)*t0;
+        const nx = sx+(ex-sx)*t1, ny = sy+(ey-sy)*t1;
+        const mcx=(cx+nx)/2, mcy=(cy+ny)/2;
+        const dx=nx-cx, dy=ny-cy;
+        const dist=Math.hypot(dx,dy)/2;
+        const ang1 = Math.atan2(cy-mcy, cx-mcx);
+        const ang2 = Math.atan2(ny-mcy, nx-mcx);
+        c.arc(mcx, mcy, dist, ang1, ang2, false);
+      }
+    }
+    c.lineWidth = Math.max(1.5, a.thickness*0.75);
+    c.stroke();
+  }
+
+  function pointNearAnnotation(a, x, y, tol){
+    if(a.tool==='rect' || a.tool==='cloud'){
+      const [p0,p1]=a.points;
+      const x0=Math.min(p0.x,p1.x), y0=Math.min(p0.y,p1.y);
+      const x1=Math.max(p0.x,p1.x), y1=Math.max(p0.y,p1.y);
+      const edges = [[x0,y0,x1,y0],[x1,y0,x1,y1],[x1,y1,x0,y1],[x0,y1,x0,y0]];
+      return edges.some(([ax,ay,bx,by])=> distToSeg(x,y,ax,ay,bx,by)<tol);
+    }
+    const pts = a.points;
+    for(let i=0;i<pts.length-1;i++){
+      if(distToSeg(x,y,pts[i].x,pts[i].y,pts[i+1].x,pts[i+1].y)<tol) return true;
+    }
+    if(pts.length===1) return Math.hypot(x-pts[0].x,y-pts[0].y)<tol;
+    return false;
+  }
+  function distToSeg(px,py,x1,y1,x2,y2){
+    const dx=x2-x1, dy=y2-y1;
+    const lenSq = dx*dx+dy*dy;
+    let t = lenSq===0?0:((px-x1)*dx+(py-y1)*dy)/lenSq;
+    t = Math.max(0, Math.min(1,t));
+    const cx=x1+t*dx, cy=y1+t*dy;
+    return Math.hypot(px-cx, py-cy);
+  }
+
+  // ---------- render ----------
+  function render(){
+    if(!state.pages.length) return;
+    const p = state.pages[state.currentPage];
+    pageCanvas.width = p.w;
+    pageCanvas.height = p.h;
+    ctx.clearRect(0,0,p.w,p.h);
+    ctx.drawImage(p.canvas, 0, 0);
+    p.annotations.forEach(a=> drawAnnotation(ctx, a));
+    if(currentStroke) drawAnnotation(ctx, currentStroke);
+    applyTransform();
+  }
+
+  function applyTransform(){
+    canvasHost.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+  }
+
+  // ---------- file loading ----------
+  btnOpen.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    state.fileBaseName = file.name.replace(/\.[^.]+$/, '') || 'markup';
+    filenameEl.textContent = file.name;
+    showToast('Loading…');
+    try{
+      if(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')){
+        await loadPDF(file);
+      } else {
+        await loadImage(file);
+      }
+      emptyState.style.display = 'none';
+      specPlate.classList.add('show');
+      zoomCtl.classList.add('show');
+      state.zoom = 1; state.panX = 0; state.panY = 0;
+      fitToScreen();
+      render();
+      updateSpecPlate();
+      showToast(file.name+' loaded');
+    }catch(err){
+      console.error(err);
+      showToast('Could not open file');
+    }
+  });
+
+  async function loadPDF(file){
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+    state.pdf = pdf;
+    state.docType = 'pdf';
+    state.pageCount = pdf.numPages;
+    state.pages = [];
+    for(let i=0;i<pdf.numPages;i++) state.pages.push(null);
+    state.currentPage = 0;
+    await ensurePageRendered(0);
+    pagenav.classList.toggle('show', pdf.numPages>1);
+    updatePageIndicator();
+  }
+
+  async function ensurePageRendered(idx){
+    if(state.pages[idx]) return;
+    const page = await state.pdf.getPage(idx+1);
+    const viewport = page.getViewport({scale: 2});
+    const c = document.createElement('canvas');
+    c.width = viewport.width; c.height = viewport.height;
+    await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
+    state.pages[idx] = {
+      canvas: c, w: c.width, h: c.height,
+      ptW: viewport.width/2, ptH: viewport.height/2,
+      annotations: [], redo: []
+    };
+  }
+
+  function loadImage(file){
+    return new Promise((resolve, reject)=>{
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = ()=>{
+        const MAX = 2400;
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if(Math.max(w,h) > MAX){
+          const scale = MAX/Math.max(w,h);
+          w = Math.round(w*scale); h = Math.round(h*scale);
+        }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        state.docType = 'image';
+        state.pdf = null;
+        state.pageCount = 1;
+        state.currentPage = 0;
+        state.pages = [{canvas:c, w, h, ptW:w, ptH:h, annotations:[], redo:[]}];
+        pagenav.classList.remove('show');
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  function fitToScreen(){
+    if(!state.pages.length) return;
+    const p = state.pages[state.currentPage];
+    const wrapRect = stageWrap.getBoundingClientRect();
+    const pad = 24;
+    const scale = Math.min((wrapRect.width-pad)/p.w, (wrapRect.height-pad)/p.h, 1.4);
+    state.zoom = Math.max(scale, 0.05);
+    state.panX = (wrapRect.width - p.w*state.zoom)/2;
+    state.panY = (wrapRect.height - p.h*state.zoom)/2;
+    applyTransform();
+  }
+
+  // ---------- page nav ----------
+  function updatePageIndicator(){
+    pageIndicator.textContent = (state.currentPage+1)+' / '+state.pageCount;
+  }
+  btnPrev.addEventListener('click', async ()=>{
+    if(state.currentPage<=0) return;
+    state.currentPage--;
+    await ensurePageRendered(state.currentPage);
+    fitToScreen(); render(); updatePageIndicator();
+  });
+  btnNext.addEventListener('click', async ()=>{
+    if(state.currentPage>=state.pageCount-1) return;
+    state.currentPage++;
+    await ensurePageRendered(state.currentPage);
+    fitToScreen(); render(); updatePageIndicator();
+  });
+
+  // ---------- undo / redo ----------
+  btnUndo.addEventListener('click', ()=>{
+    const p = state.pages[state.currentPage];
+    if(!p || !p.annotations.length) return;
+    p.redo.push(p.annotations.pop());
+    render();
+  });
+  btnRedo.addEventListener('click', ()=>{
+    const p = state.pages[state.currentPage];
+    if(!p || !p.redo.length) return;
+    p.annotations.push(p.redo.pop());
+    render();
+  });
+
+  // ---------- pointer / touch handling ----------
+  let currentStroke = null;
+  let drawingPointerId = null;
+  const activePointers = new Map();
+  let pinchLastDist = 0, pinchLastCenter = null;
+
+  function clientToCanvas(clientX, clientY){
+    const rect = stageWrap.getBoundingClientRect();
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
+    return {
+      x: (localX - state.panX) / state.zoom,
+      y: (localY - state.panY) / state.zoom
+    };
+  }
+
+  pageCanvas.addEventListener('pointerdown', onPointerDown);
+  stageWrap.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
+
+  function onPointerDown(e){
+    if(!state.pages.length) return;
+    e.preventDefault();
+    activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+    if(activePointers.size === 2){
+      if(currentStroke){ currentStroke=null; drawingPointerId=null; render(); }
+      const pts = [...activePointers.values()];
+      pinchLastDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      pinchLastCenter = {x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2};
+      return;
+    }
+    if(activePointers.size > 2) return;
+
+    if(state.tool === 'eraser'){
+      drawingPointerId = e.pointerId;
+      eraseAt(e.clientX, e.clientY);
+      return;
+    }
+
+    drawingPointerId = e.pointerId;
+    const pt = clientToCanvas(e.clientX, e.clientY);
+    currentStroke = {
+      tool: state.tool, color: state.color, thickness: state.thickness,
+      linetype: state.linetype, points: [pt]
+    };
+    render();
+  }
+
+  function onPointerMove(e){
+    if(!activePointers.has(e.pointerId)) return;
+    activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+    if(activePointers.size === 2){
+      const pts = [...activePointers.values()];
+      const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      const center = {x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2};
+      if(pinchLastDist>0){
+        let newZoom = state.zoom * (dist/pinchLastDist);
+        newZoom = Math.max(0.1, Math.min(newZoom, 6));
+        const rect = stageWrap.getBoundingClientRect();
+        const anchorX = pinchLastCenter.x - rect.left;
+        const anchorY = pinchLastCenter.y - rect.top;
+        state.panX = anchorX - (anchorX - state.panX) * (newZoom/state.zoom);
+        state.panY = anchorY - (anchorY - state.panY) * (newZoom/state.zoom);
+        state.panX += center.x - pinchLastCenter.x;
+        state.panY += center.y - pinchLastCenter.y;
+        state.zoom = newZoom;
+        applyTransform();
+      }
+      pinchLastDist = dist;
+      pinchLastCenter = center;
+      return;
+    }
+
+    if(e.pointerId !== drawingPointerId) return;
+
+    if(state.tool === 'eraser'){
+      eraseAt(e.clientX, e.clientY);
+      return;
+    }
+    if(!currentStroke) return;
+    const pt = clientToCanvas(e.clientX, e.clientY);
+    if(state.tool === 'pen'){
+      currentStroke.points.push(pt);
+    } else {
+      currentStroke.points[1] = pt;
+    }
+    render();
+  }
+
+  function onPointerUp(e){
+    if(activePointers.has(e.pointerId)) activePointers.delete(e.pointerId);
+    if(activePointers.size < 2){ pinchLastDist = 0; pinchLastCenter = null; }
+
+    if(e.pointerId === drawingPointerId){
+      drawingPointerId = null;
+      if(currentStroke){
+        if(currentStroke.tool!=='pen' && !currentStroke.points[1]) currentStroke.points[1]=currentStroke.points[0];
+        const p = state.pages[state.currentPage];
+        const valid = currentStroke.tool==='pen' ? currentStroke.points.length>1 :
+          Math.hypot(currentStroke.points[1].x-currentStroke.points[0].x, currentStroke.points[1].y-currentStroke.points[0].y) > 2;
+        if(valid){
+          p.annotations.push(currentStroke);
+          p.redo = [];
+        }
+        currentStroke = null;
+        render();
+      }
+    }
+  }
+
+  function eraseAt(clientX, clientY){
+    const p = state.pages[state.currentPage];
+    if(!p) return;
+    const pt = clientToCanvas(clientX, clientY);
+    const tol = Math.max(14, state.thickness*2) / state.zoom;
+    const before = p.annotations.length;
+    p.annotations = p.annotations.filter(a=> !pointNearAnnotation(a, pt.x, pt.y, tol));
+    if(p.annotations.length !== before){ p.redo=[]; render(); }
+  }
+
+  // ---------- zoom buttons ----------
+  el('zoomIn').addEventListener('click', ()=> zoomBy(1.25));
+  el('zoomOut').addEventListener('click', ()=> zoomBy(0.8));
+  el('zoomReset').addEventListener('click', fitToScreen);
+  function zoomBy(f){
+    const rect = stageWrap.getBoundingClientRect();
+    const cx = rect.width/2, cy = rect.height/2;
+    const newZoom = Math.max(0.1, Math.min(state.zoom*f, 6));
+    state.panX = cx - (cx-state.panX)*(newZoom/state.zoom);
+    state.panY = cy - (cy-state.panY)*(newZoom/state.zoom);
+    state.zoom = newZoom;
+    applyTransform();
+  }
+
+  window.addEventListener('resize', ()=>{ if(state.pages.length) applyTransform(); });
+
+  // ---------- export ----------
+  btnExport.addEventListener('click', async ()=>{
+    if(!state.pages.length){ showToast('Nothing to export'); return; }
+    showToast('Exporting…');
+    try{
+      if(state.docType === 'image'){
+        const p = state.pages[0];
+        const out = flattenPage(p);
+        out.toBlob(blob=>{
+          downloadBlob(blob, state.fileBaseName+'_markup.png');
+        }, 'image/png');
+      } else {
+        for(let i=0;i<state.pageCount;i++) await ensurePageRendered(i);
+        const { jsPDF } = window.jspdf;
+        let pdfDoc;
+        state.pages.forEach((p, i)=>{
+          const flat = flattenPage(p);
+          const imgData = flat.toDataURL('image/jpeg', 0.92);
+          if(i===0){
+            pdfDoc = new jsPDF({unit:'pt', format:[p.ptW, p.ptH]});
+          } else {
+            pdfDoc.addPage([p.ptW, p.ptH]);
+          }
+          pdfDoc.addImage(imgData, 'JPEG', 0, 0, p.ptW, p.ptH);
+        });
+        downloadBlob(pdfDoc.output('blob'), state.fileBaseName+'_markup.pdf');
+      }
+      showToast('Exported ✓');
+    }catch(err){
+      console.error(err);
+      showToast('Export failed');
+    }
+  });
+
+  function flattenPage(p){
+    const c = document.createElement('canvas');
+    c.width = p.w; c.height = p.h;
+    const cctx = c.getContext('2d');
+    cctx.drawImage(p.canvas, 0, 0);
+    p.annotations.forEach(a=> drawAnnotation(cctx, a));
+    return c;
+  }
+
+  function downloadBlob(blob, name){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+  }
+
+  updateSpecPlate();
+})();
+</script>
+</body>
+</html>

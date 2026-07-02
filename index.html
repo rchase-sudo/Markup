@@ -28,6 +28,8 @@
     height:100%; margin:0; overflow:hidden; background:var(--navy-deep);
     font-family:var(--sans); color:var(--ink);
     -webkit-user-select:none; user-select:none;
+    overscroll-behavior:none;
+    touch-action:none;
   }
   #app{
     display:flex; flex-direction:column; height:100%;
@@ -79,6 +81,7 @@
       var(--navy-deep);
     background-blend-mode:overlay;
     touch-action:none;
+    overscroll-behavior:none;
   }
   #stageWrap::before{
     content:''; position:absolute; inset:0; opacity:.35;
@@ -695,9 +698,10 @@
     };
   }
 
-  pageCanvas.addEventListener('pointerdown', onPointerDown);
+  // Single listener on stageWrap only (canvas is inside it, so this
+  // avoids the double-fire that happened when both elements had handlers).
   stageWrap.addEventListener('pointerdown', onPointerDown);
-  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointermove', onPointerMove, {passive:false});
   window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('pointercancel', onPointerUp);
 
@@ -705,6 +709,10 @@
     if(!state.pages.length) return;
     e.preventDefault();
     activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+    // Lock this pointer to the stage so iOS can't hand the gesture
+    // back to native scroll/rubber-band mid-stroke.
+    try{ stageWrap.setPointerCapture(e.pointerId); }catch(err){}
 
     if(activePointers.size === 2){
       if(currentStroke){ currentStroke=null; drawingPointerId=null; render(); }
@@ -732,6 +740,7 @@
 
   function onPointerMove(e){
     if(!activePointers.has(e.pointerId)) return;
+    e.preventDefault();
     activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
 
     if(activePointers.size === 2){
@@ -773,6 +782,8 @@
   }
 
   function onPointerUp(e){
+    e.preventDefault();
+    try{ stageWrap.releasePointerCapture(e.pointerId); }catch(err){}
     if(activePointers.has(e.pointerId)) activePointers.delete(e.pointerId);
     if(activePointers.size < 2){ pinchLastDist = 0; pinchLastCenter = null; }
 
